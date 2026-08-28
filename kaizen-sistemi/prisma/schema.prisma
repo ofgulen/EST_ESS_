@@ -1,0 +1,123 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" 
+  url      = env("DATABASE_URL")
+}
+
+// 1. Temel Çalışan Tablosu
+model Calisan {
+  calisanId         Int              @id @default(autoincrement())
+  adSoyad           String           @db.VarChar(150)
+  email             String           @db.VarChar(150) @unique
+  departman         String           @db.VarChar(100)
+  
+  oneriler          Oneri[]          @relation("OlusturanCalisan")
+  sorumluProfili    OneriSorumlusu?  
+  yoneticiProfili   Yonetici?
+}
+
+// 2. Öneri Sorumlusu Tablosu
+model OneriSorumlusu {
+  sorumluId         Int              @id
+  yetkiSeviyesi     String           @db.VarChar(50)
+  atanmaTarihi      DateTime         @db.Date
+  
+  calisan           Calisan          @relation(fields: [sorumluId], references: [calisanId])
+  
+  sorumluOlduguOneriler Oneri[]      @relation("OneriSorumlusu")
+  atadigiOneriler       Oneri[]      @relation("AtayanSorumlu")
+  degerlendirmeler      Degerlendirme[] @relation("OnaylayanSorumlu")
+  gecmisDegisiklikler   DegerlendirmeGecmisi[] @relation("DegistirenSorumlu")
+}
+
+// 3. Yönetici Tablosu
+model Yonetici {
+  yoneticiId        Int              @id
+  yonetimSeviyesi   String           @db.VarChar(50)
+  departman         String           @db.VarChar(100)
+  
+  calisan           Calisan          @relation(fields: [yoneticiId], references: [calisanId])
+  degerlendirmeler  Degerlendirme[]
+}
+
+// 4. Ana Öneri Tablosu
+model Oneri {
+  oneriId           Int              @id @default(autoincrement())
+  baslik            String           @db.VarChar(200)
+  aciklama          String           @db.Text
+  oneriTarihi       DateTime         
+  durum             String           @db.VarChar(50)
+  
+  olusturanCalisanId Int
+  olusturanCalisan  Calisan          @relation("OlusturanCalisan", fields: [olusturanCalisanId], references: [calisanId])
+  
+  sorumluId         Int?
+  sorumlu           OneriSorumlusu?  @relation("OneriSorumlusu", fields: [sorumluId], references: [sorumluId])
+  
+  atayanSorumluId   Int?
+  atayanSorumlu     OneriSorumlusu?  @relation("AtayanSorumlu", fields: [atayanSorumluId], references: [sorumluId])
+  
+  nlpAnalizleri     NlpAnaliz[]
+  degerlendirmeler  Degerlendirme[]
+  degerlendirmeGecmisleri DegerlendirmeGecmisi[]
+}
+
+// 5. NLP Analiz Çıktıları Tablosu
+model NlpAnaliz {
+  analizId          Int              @id @default(autoincrement())
+  
+  oneriId           Int
+  oneri             Oneri            @relation(fields: [oneriId], references: [oneriId])
+  
+  duyguSkoru        Decimal          @db.Decimal(5, 2)
+  kategoriTahmini   String?          @db.VarChar(100)
+  anahtarKelimeler  String           @db.Text
+  oncelikOneri      String           @db.VarChar(100)
+  analizTarihi      DateTime
+}
+
+// 6. Değerlendirme Tablosu
+model Degerlendirme {
+  degerlendirmeId   Int              @id @default(autoincrement())
+  
+  oneriId           Int
+  oneri             Oneri            @relation(fields: [oneriId], references: [oneriId])
+  
+  onaylayanSorumluId Int
+  onaylayanSorumlu  OneriSorumlusu   @relation("OnaylayanSorumlu", fields: [onaylayanSorumluId], references: [sorumluId])
+  
+  yoneticiId        Int
+  yonetici          Yonetici         @relation(fields: [yoneticiId], references: [yoneticiId])
+  
+  degerlendirmeNotu String           @db.Text
+  puan              Int
+  sonuc             String           @db.VarChar(50)
+  degerlendirmeTarihi DateTime
+  
+  yoneticiKatkisi   String?          @db.Text
+  yoneticiKatkisiTarihi DateTime?
+  
+  gecmisKayitlari   DegerlendirmeGecmisi[]
+}
+
+// 7. Log ve Süreç Geçmişi Tablosu
+model DegerlendirmeGecmisi {
+  gecmisId          Int              @id @default(autoincrement())
+  
+  degerlendirmeId   Int
+  degerlendirme     Degerlendirme    @relation(fields: [degerlendirmeId], references: [degerlendirmeId])
+  
+  oneriId           Int
+  oneri             Oneri            @relation(fields: [oneriId], references: [oneriId])
+  
+  eskiDurum         String           @db.VarChar(50)
+  yeniDurum         String           @db.VarChar(50)
+  
+  degistirenSorumluId Int
+  degistirenSorumlu OneriSorumlusu   @relation("DegistirenSorumlu", fields: [degistirenSorumluId], references: [sorumluId])
+  
+  degisiklikTarihi  DateTime
+}
